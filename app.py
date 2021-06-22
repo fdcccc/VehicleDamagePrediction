@@ -12,7 +12,7 @@ st.title('Price Chart')
 id = st.sidebar.text_input("Enter Stock Ticke (example: AAPL)")
 stock = yf.Ticker(id)
 df=stock.history(period='max')['Close']
-if len(df)==0:
+if len(df)==0 and len(id)>0:
     st.write('Invalid Stock Ticker')
 else:
     df.index=pd.DatetimeIndex(df.index)
