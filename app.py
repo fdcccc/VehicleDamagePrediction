@@ -78,7 +78,7 @@ if day_of_week_pre =='all':
 pal=list(palette)
 pal.reverse()
 
-area = gpd.read_file('Data/geo.shp')
+area = gpd.read_file('geo.shp')
 area=area.astype({'area_num_1': 'int'})
 area=area.merge(total_pre,left_on='area_num_1',right_on='COMMUNITY')
 geo_source = GeoJSONDataSource(geojson=area.to_json())
@@ -140,3 +140,25 @@ if im=='Rates':
     p2.add_tools(hover2)
 
     st.bokeh_chart(p2)
+
+st.markdown("""---""")
+st.header('Select community name to see historical data.')
+
+comm = st.selectbox('',area['community'].sort_values()).title()
+pl=his[his['GEOG']==comm]
+pl['Time']=pd.to_datetime(pl['time'])
+
+
+p3 = figure(title='Number of Monthly Car Damage Incidents in {c} from 2017-9 to 2021-7'.format(c=comm),
+           width=700,height=500, x_axis_type="datetime")
+p3.title.text_font_size = '12pt'
+
+p3.line(x='Time', y='Total',line_width=2,source=ColumnDataSource(pl))
+
+p3.xaxis.ticker.desired_num_ticks = 9
+hover3 = HoverTool()
+hover3.tooltips = [('Date','@time'),('Number', '@Total')]
+p3.add_tools(hover3)
+
+
+st.bokeh_chart(p3)
