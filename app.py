@@ -17,10 +17,6 @@ from bokeh.palettes import Blues8  as palette
 from bokeh.models import HoverTool
 
 
-
-# In[8]:
-
-
 model_crime=dill.load(open('model_crime.pkd','rb'))
 model_crash=dill.load(open('model_crash.pkd','rb'))
 current=dill.load(open('current.pkd', 'rb'))
@@ -40,3 +36,107 @@ with st.sidebar:
     st.write("## Select prediction type")
     im=st.radio('',['Numbers' , 'Rates'])
     
+dwl={'Weekdays':'weekday','Weekends':'weekend','Everyday':'all'}
+day_of_week_pre=dwl[dw]
+Year_pre,Month_pre=int(Month_sel.split('-')[0]),int(Month_sel.split('-')[1])
+
+if Year_pre==2021:
+    k=Month_pre-7
+if Year_pre==2022:
+    k=Month_pre+5
+
+if day_of_week_pre !='all':    
+    current['pre']['Year']=Year_pre
+    current['pre']['Month']=Month_pre
+    current['pre']['day_of_week']=day_of_week_pre
+
+    crime_pre=current['pre'].copy()
+    crime_pre['mean-'+str(k)]=current['crime'][(current['crime'])['day_of_week']==day_of_week_pre]['mean'].values
+    crime_pre['Total']=model_crime[k].predict(crime_pre).round(2)
+    crash_pre=current['pre'].copy()
+    crash_pre['mean-'+str(k)]=current['crash'][(current['crash'])['day_of_week']==day_of_week_pre]['mean'].values
+    crash_pre['Total']=model_crash[k].predict(crash_pre).round(2)
+    total_pre=current['pre'].copy()
+    total_pre['Total']=crime_pre['Total']+crash_pre['Total']
+    total_pre['Rate']=(total_pre['Total']/total_pre['TOT_POP']*10000).round(2)
+    
+if day_of_week_pre =='all':    
+    current_all['pre']['Year']=Year_pre
+    current_all['pre']['Month']=Month_pre
+    crime_pre=current_all['pre'].copy()
+    crime_pre['mean-'+str(k)]=current_all['crime']['mean'].values
+    crime_pre['Total']=model_all_crime[k].predict(crime_pre).round(2)
+    crash_pre=current_all['pre'].copy()
+    crash_pre['mean-'+str(k)]=current_all['crash']['mean'].values
+    crash_pre['Total']=model_all_crash[k].predict(crash_pre).round(2)
+    total_pre=current_all['pre'].copy()
+    total_pre['Total']=crime_pre['Total']+crash_pre['Total']
+    total_pre['Rate']=(total_pre['Total']/total_pre['TOT_POP']*10000).round(2)
+
+
+
+pal=list(palette)
+pal.reverse()
+
+area = gpd.read_file('Data/geo.shp')
+area=area.astype({'area_num_1': 'int'})
+area=area.merge(total_pre,left_on='area_num_1',right_on='COMMUNITY')
+geo_source = GeoJSONDataSource(geojson=area.to_json())
+
+
+
+st.title('Vehicle Damage Prediction in Chicago Community Areas')
+
+
+st.markdown('Vehicle damages can be accident related or crime related. Most common auto insurance claims include car crash, vandalism and theft. Auto insurance companies are interested in estimating the probability of vehicle damages.')
+
+
+st.markdown('Many auto insurance companies promote their mobile Apps that can track driving patterns and frequently visited areas. This project aims to predict **car damages caused by crashes and crimes** in all community areas of Chicago in the next **6 months**, which is the usual auto insurance policy period.')
+
+st.markdown('The data source is [Chicago Data Portal](https://data.cityofchicago.org/). Crime data is collected from 2010-01 to 2021-07, crash data is collected from 2017-09 to 2021-07.')
+
+st.markdown("""---""")
+
+if im=='Numbers':
+    st.header('Prediction of car damage incident numbers.')
+    p = figure(title='Car Damage Incidents Number Prediction for {t} ({wd})'.format(t=Month_sel,wd=dw.lower()),
+               plot_width=700,plot_height=700)
+    high=total_pre['Total'].max()
+    high-=high%-10
+    color_mapper = LinearColorMapper(palette=pal,low=0,high=high)
+    p.patches('xs', 'ys', fill_color={'field': 'Total', 'transform': color_mapper}, 
+              line_color='black', line_width=0.5, source=geo_source)
+    p.title.text_font_size = '13pt'
+    p.grid.grid_line_color = None
+    p.axis.visible = False
+    color_bar = ColorBar(color_mapper=color_mapper)                  
+    p.add_layout(color_bar, 'right')
+    hover1 = HoverTool()
+    hover1.tooltips = [('Community','@community'),('Number', '@Total{0.00}')]
+    p.add_tools(hover1)
+
+
+
+
+    st.bokeh_chart(p)
+    
+if im=='Rates':
+    st.header('Prediction of car damage incident rates (per 10,000 population).')
+    p2 = figure(title='Car Damage Incidents Rate Prediction for {t} ({wd})'.format(t=Month_sel,wd=dw.lower()),
+                plot_width=700, plot_height=700)
+    high2=total_pre['Rate'].max()
+    high2-=high2%(-10)
+    color_mapper2 = LinearColorMapper(palette=pal,low=0,high=high2)
+    geo_source = GeoJSONDataSource(geojson=area.to_json())
+    p2.patches('xs', 'ys', fill_color={'field': 'Rate', 'transform': color_mapper2}, 
+              line_color='black', line_width=0.5, source=geo_source)
+    p2.title.text_font_size = '13pt'
+    p2.grid.grid_line_color = None
+    p2.axis.visible = False
+    color_bar2 = ColorBar(color_mapper=color_mapper2)                  
+    p2.add_layout(color_bar2, 'right')
+    hover2 = HoverTool()
+    hover2.tooltips = [('Community','@community'),('Rate', '@Rate{0.00}')]
+    p2.add_tools(hover2)
+
+    st.bokeh_chart(p2)
