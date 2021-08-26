@@ -6,3 +6,8 @@ altair
 bokeh
 requests
 yfinance
+matplotlib
+bokeh==2.2.2 
+dill
+geopandas
+scikit-learn
